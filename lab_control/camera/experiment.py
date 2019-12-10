@@ -1,4 +1,4 @@
-import pyfli
+from FLI import FLI
 import numpy as np
 import sys
 sys.path.append('../')
@@ -8,61 +8,11 @@ import logging
 import csv
 
 # parameters
-DEVICE = 'camera'
-INTERFACE = 'usb'
-FRAME_TYPE = "normal" # {'normal', 'dark', 'flood', 'flush'}
-handle = None
 EXPOSURE_TIME = 8 # miliseconds
 SAVEPATH = ""
 
 # logger
 logger = thr640.logger
-
-"""
-configure functions
-"""
-# mode: {0,1}, return value = xxKHZ
-def getCameraModeString(mode:int):
-    return pyfli.getCameraModeString(handle,mode)
-
-# Get the remaining camera exposure time. exposure time given in milliseconds
-def getExposureStatus():
-    return pyfli.getExposureStatus(handle)
-
-def getDeviceStatus():
-    return pyfli.getDeviceStatus(handle)
-
-def getTemperature():
-    return pyfli.getTemperature(handle)
-
-def grabFrame():
-    return pyfli.grabFrame(handle)
-
-# open shutter and expose frame. exposes a frame according to the settings (image area,
-# exposure time, bit depth, etc.). exposure time should be assigned before.
-# This function returns after the exposure has started
-def exposeFrame():
-    pyfli.exposeFrame(handle)
-
-def cancelExposure():
-    pyfli.cancelExposure(handle)
-
-# you should give exposure time in milliseconds
-def setExposureTime(time):
-    pyfli.setExposureTime(handle,time)
-
-def setTemperature():
-    pyfli.setTemperature(handle)
-
-def FLIOpen(device_path,interface,device):
-    return pyfli.FLIOpen(device_path,interface,device)
-
-def FLIClose():
-    pyfli.FLIClose(handle)
-
-def unlockDevice():
-    pyfli.unlockDevice(handle)
-
 
 def write_csv(array):
     with open('some.csv', 'w') as f:
@@ -74,36 +24,31 @@ def write_csv(array):
 main
 """
 def main():
-    controller = thr640.THR640()
-    # get camera information
-    fli_list = pyfli.FLIList(INTERFACE,DEVICE)
-    if not fli_list:
-        Exception("No device can be found")
-    
-    DEVICE_PATH, DEVICE_NAME = fli_list[0]
-    global handle
-    handle = FLIOpen(DEVICE_PATH,INTERFACE,DEVICE)
+    fli = FLI()
 
     # print information
-    logger.info("カメラの温度: {}".format(getTemperature()))
-    logger.info("カメラの状態: {}".format(getDeviceStatus()))
-    logger.info("カメラモード: {}".format(getCameraModeString(0)))
+    logger.info("カメラの温度: {}".format(fli.getTemperature()))
+    logger.info("カメラの状態: {}".format(fli.getDeviceStatus()))
+    logger.info("カメラモード: {}".format(fli.getCameraModeString(0)))
 
-    controller.goto(count=-97000)
-    controller.waitUntilReady()
+    # controller = thr640.THR640()
+    # controller.goto(count=-97000)
+    # controller.waitUntilReady()
 
-    setExposureTime(EXPOSURE_TIME)
+    fli.setExposureTime(EXPOSURE_TIME)
 
     # start exposure
-    exposeFrame()
+    fli.exposeFrame()
 
     # exposure終わったらgrab
-    array = grabFrame()
+    array = fli.grabFrame()
 
     ## TODO: 出力
     print(array)
-    FLIClose()
 
+"""
+撮影して回折格子動かすを繰り返す
+"""
 def continuousShooting(startCoordinate: int,endCoordinate: int, coordinateInterval: int, exposureTimes: "List[int]"):
     '''
     ==========
