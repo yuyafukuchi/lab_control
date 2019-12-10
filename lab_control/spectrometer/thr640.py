@@ -80,6 +80,15 @@ class THR640:
             count = self._wavelength_to_count(wavelength)
 
         self._send_goto(count)
+    
+    def waitUntilReady(self):
+        """
+        wait until check ready is true
+        """
+        is_ready = self._check_ready()
+        while is_ready==False:
+            is_ready = self._check_ready()
+            time.sleep(.1)
 
     def _readline(self):
         """print response from controller"""
@@ -114,11 +123,7 @@ class THR640:
         count = abs(count)
         D = "D{} {} {}".format(AXIS,r_direction,count)
 
-        ## wait until check ready is true
-        is_ready = self._check_ready()
-        while is_ready==False:
-            is_ready = self._check_ready()
-            time.sleep(.1)
+        self.waitUntilReady()
 
         logger.info("Move to {}{}".format(r_direction,count))
         self.ser.write((D+CR).encode('utf-8'))
