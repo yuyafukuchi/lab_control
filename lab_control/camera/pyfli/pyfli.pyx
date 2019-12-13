@@ -95,16 +95,7 @@ Deprecated Functions
 --------------------
 FLIHomeFocuser, deprecated, use homeDevice
 
-Notes
------
 
-The functions can be collected together into cdef classes and that makes
-the generated module significantly smaller as the ``device`` number can
-be stored as a C type when the classes are instantiated and used in the
-FLI function calls. However, the current form as a collection of separate
-functions is a bit lower level and was chosen for that reason.
-
-"""
 import os
 import sys
 import warnings

@@ -6,6 +6,7 @@ from spectrometer import thr640
 import time
 import logging
 import csv
+import xarray as xr
 
 # parameters
 EXPOSURE_TIME = 8 # miliseconds
@@ -17,23 +18,20 @@ logger = thr640.logger
 def write_csv(array):
     with open('some.csv', 'w') as f:
         writer = csv.writer(f, lineterminator='\n')
-        # writer.writerow(list)     # list（1次元配列）の場合
         writer.writerows(array) # 2次元配列
 
+fli = FLI()
+wavelength_controller = thr640.THR640()
 """
 main
 """
-def main():
+def take_one_shoot():
     fli = FLI()
 
     # print information
     logger.info("カメラの温度: {}".format(fli.getTemperature()))
     logger.info("カメラの状態: {}".format(fli.getDeviceStatus()))
     logger.info("カメラモード: {}".format(fli.getCameraModeString(0)))
-
-    # controller = thr640.THR640()
-    # controller.goto(count=-97000)
-    # controller.waitUntilReady()
 
     fli.setExposureTime(EXPOSURE_TIME)
 
@@ -49,45 +47,53 @@ def main():
 """
 撮影して回折格子動かすを繰り返す
 """
-def continuousShooting(startCoordinate: int,endCoordinate: int, coordinateInterval: int, exposureTimes: "List[int]"):
-    '''
-    ==========
-    Parameters
-    ==========
 
-    startCoordinate: 最初の回折格子の座標
-    coordinateInterval: 撮影が終わったらこの値の分だけ座標更新。正の数
-    endCoordinate: 回折格子の座標がこの値を超えたら終了。start<endで指定
-    exposureTimes: 露光時間のリスト。一つの座標につきexposureTimesの要素数回撮影が行われる.
-    '''
-    controller = thr640.THR640()
+def move_and_shoot(count, exposure_time):
+    wavelength_controller.goto(count=count)
+    wavelength_controller.waitUntilReady()
 
-    # get camera information
-    fli_list = pyfli.FLIList(INTERFACE,DEVICE)
-    if not fli_list:
-        Exception("No device can be found")
-    
-    DEVICE_PATH, DEVICE_NAME = fli_list[0]
-    global handle
-    handle = FLIOpen(DEVICE_PATH,INTERFACE,DEVICE)
+    fli.setExposureTime(exposure_time)
 
-    currentCoordinate = startCoordinate
+    # start exposure
+    fli.exposeFrame()
+    # exposure終わったらgrab
+    array = fli.grabFrame()
 
-    logger.info("start operating...")
-    while currentCoordinate < endCoordinate:
-        logger.info("Move to {}".format(currentCoordinate))
-        controller.goto(count=currentCoordinate)
-        controller.waitUntilReady()
-        setExposureTime(EXPOSURE_TIME)
-        exposeFrame()
-        # TODO: 出力
-        array = grabFrame()
-        print(array)
-        currentCoordinate+=coordinateInterval
+    data = xr.DataArray(array, dims=['y', 'x'], coords={'spectrometer_count': count}, 
+                        attrs={'temperature': fli.getTemperature(),
+                               'device_status': fli.getDeviceStatus(),
+                               'camera_mode': fli.getCameraModeString(0),
+                               'exposure_time': exposure_time
+                               })
+    return data
 
-    logger.info("Successfully finish operating!!!")
-    FLIClose()
+## exposuretime 動かしながら撮影、bin,tempreture固定
+def shoot_and_update_exposure():
+    output_dir = r'C:\Users\Public\Documents\seminar\exposuretime'
+
+    ## 10ms~10e4msまで調べたい
+    bitween = 0.1
+    start = 0.9
+    for i in range(31):
+        start += bitween
+        fli.setExposureTime(int(10**start))
+        time.sleep(1)
+
+        # start exposure
+        fli.exposeFrame()
+        # exposure終わったらgrab
+        array = fli.grabFrame()
+
+        data = xr.DataArray(array, dims=['y', 'x'], coords={'exposure_time': int(10**start)}, 
+                            attrs={'temperature': fli.getTemperature(),
+                                'device_status': fli.getDeviceStatus(),
+                                'camera_mode': fli.getCameraModeString(0)
+                                })
+        file=r'\output'+ str(i)+'.nc'
+        data.to_netcdf(output_dir + file)
+        print(str(i) +'done')
+        time.sleep(2)
 
 
 if __name__ == "__main__":
-    main()
+    shoot_and_update_exposure()

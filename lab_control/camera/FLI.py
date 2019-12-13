@@ -47,8 +47,8 @@ class FLI:
     def setExposureTime(self,time):
         pyfli.setExposureTime(self.handle,time)
 
-    def setTemperature(self):
-        pyfli.setTemperature(self.handle)
+    def setTemperature(self,t):
+        pyfli.setTemperature(self.handle,t)
 
     def FLIOpen(self,device_path,interface,device):
         return pyfli.FLIOpen(device_path,interface,device)
