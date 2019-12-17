@@ -8,20 +8,14 @@ import logging
 import csv
 import xarray as xr
 
-# parameters
-EXPOSURE_TIME = 8 # miliseconds
-SAVEPATH = ""
-
 # logger
 logger = thr640.logger
 
-def write_csv(array):
-    with open('some.csv', 'w') as f:
-        writer = csv.writer(f, lineterminator='\n')
-        writer.writerows(array) # 2次元配列
 
+# global instance
 fli = FLI()
 wavelength_controller = thr640.THR640()
+
 """
 main
 """
@@ -45,14 +39,11 @@ def take_one_shoot():
     print(array)
 
 """
-撮影して回折格子動かすを繰り返す
+撮影して回折格子動かす
 """
-
-def move_and_shoot(count, exposure_time):
+def move_and_shoot(count,exposure_time):
     wavelength_controller.goto(count=count)
     wavelength_controller.waitUntilReady()
-
-    fli.setExposureTime(exposure_time)
 
     # start exposure
     fli.exposeFrame()
@@ -67,6 +58,88 @@ def move_and_shoot(count, exposure_time):
                                'exposure_time': exposure_time
                                })
     return data
+
+"""
+撮影して回折格子動かす(早いver)
+"""
+def fast_move_and_shoot(count,exposure_time):
+    wavelength_controller.goto(count=count)
+
+    # start exposure
+    fli.exposeFrame()
+    # exposure終わったらgrab
+    array = fli.grabFrame()
+    time.sleep(.5)
+
+    data = xr.DataArray(array, dims=['y', 'x'], coords={'spectrometer_count': count}, 
+                        attrs={'temperature': fli.getTemperature(),
+                               'device_status': fli.getDeviceStatus(),
+                               'camera_mode': fli.getCameraModeString(0),
+                               'exposure_time': exposure_time
+                               })
+    return data
+
+"""
+撮影して回折格子動かすを繰り返す
+"""
+def repeat_move_and_shoot(start_count,count_interval,taken_count,exposuretime,output_dir):
+    fli.setExposureTime(exposuretime)
+
+    for i in range(taken_count):
+        data = move_and_shoot(count=start_count,exposure_time=exposuretime)
+        file=r'\output'+ str(i)+'.nc'
+        data.to_netcdf(output_dir + file)
+        start_count+=count_interval
+
+"""
+シャッターを開けて撮影、閉じて撮影して回折格子動かすを繰り返す
+"""
+def repeat_move_and_shoot_with_shutter_control(start_count,count_interval,taken_count,exposuretime,output_dir,output_dir_with_shutter_close):
+    fli.setExposureTime(exposuretime)
+    for i in range(taken_count):
+        # -------shutterを開けて撮影---------
+        fli.setFrameType('normal')
+        time.sleep(1)
+        ## move
+        wavelength_controller.goto(count=start_count)
+        time.sleep(3)
+        # start exposure
+        fli.exposeFrame()
+        array = fli.grabFrame()
+        time.sleep(1)
+
+        data = xr.DataArray(array, dims=['y', 'x'], coords={'spectrometer_count': start_count}, 
+                            attrs={'temperature': fli.getTemperature(),
+                                'device_status': fli.getDeviceStatus(),
+                                'exposure_time': exposuretime,
+                                'frame_type': 'normal'
+                                })
+        file=r'\output'+ str(i)+'.nc'
+        data.to_netcdf(output_dir + file)
+
+        time.sleep(3)
+
+        # -------shutterを閉じて撮影---------
+        fli.setFrameType('dark')
+        time.sleep(1)
+
+        fli.exposeFrame()
+        array = fli.grabFrame()
+        time.sleep(1)
+
+        data = xr.DataArray(array, dims=['y', 'x'], coords={'spectrometer_count': start_count}, 
+                            attrs={'temperature': fli.getTemperature(),
+                                'device_status': fli.getDeviceStatus(),
+                                'exposure_time': exposuretime,
+                                'frame_type': 'dark'
+                                })
+        file=r'\output'+ str(i)+'_with_shutter_close'+'.nc'
+        data.to_netcdf(output_dir_with_shutter_close + file)
+
+        ## start_countあげて次のループへ
+        start_count+=count_interval
+        time.sleep(.5)
+
 
 ## exposuretime 動かしながら撮影、bin,tempreture固定
 def shoot_and_update_exposure():
@@ -97,24 +170,7 @@ def shoot_and_update_exposure():
 
 
 if __name__ == "__main__":
-    fli.setExposureTime(1000)
-    fli.setFrameType('normal')
-    time.sleep(.5)
-    fli.exposeFrame()
-    array = fli.grabFrame()
-    print(array)
-    time.sleep(2)
+    output_dir = r'C:\Users\Public\Documents\seminar\exposuretime_with_shutter_control\no_shutter'
+    output_dir2 = r'C:\Users\Public\Documents\seminar\exposuretime_with_shutter_control\shutter'
 
-
-    fli.setFrameType('dark')
-    time.sleep(1)
-    fli.exposeFrame()
-    array = fli.grabFrame()
-    print(array)
-    # x=376000
-    # output_dir = r'C:\Users\Public\Documents\seminar\seminar_exposuretime'
-    # for i in range(100):
-    #     x+=4000
-    #     data = move_and_shoot(x, 1000)
-    #     file=r'\output'+ str(94+i)+'.nc'
-    #     data.to_netcdf(output_dir + file)
+    repeat_move_and_shoot_with_shutter_control(start_count=-40000,count_interval=4000,taken_count=50,exposuretime=1000,output_dir=output_dir,output_dir_with_shutter_close=output_dir2)
