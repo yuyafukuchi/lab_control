@@ -58,6 +58,7 @@ def move_and_shoot(count, exposure_time):
     fli.exposeFrame()
     # exposure終わったらgrab
     array = fli.grabFrame()
+    time.sleep(.5)
 
     data = xr.DataArray(array, dims=['y', 'x'], coords={'spectrometer_count': count}, 
                         attrs={'temperature': fli.getTemperature(),
@@ -83,7 +84,7 @@ def shoot_and_update_exposure():
         fli.exposeFrame()
         # exposure終わったらgrab
         array = fli.grabFrame()
-
+        time.sleep(.1)
         data = xr.DataArray(array, dims=['y', 'x'], coords={'exposure_time': int(10**start)}, 
                             attrs={'temperature': fli.getTemperature(),
                                 'device_status': fli.getDeviceStatus(),
@@ -96,4 +97,24 @@ def shoot_and_update_exposure():
 
 
 if __name__ == "__main__":
-    shoot_and_update_exposure()
+    fli.setExposureTime(1000)
+    fli.setFrameType('normal')
+    time.sleep(.5)
+    fli.exposeFrame()
+    array = fli.grabFrame()
+    print(array)
+    time.sleep(2)
+
+
+    fli.setFrameType('dark')
+    time.sleep(1)
+    fli.exposeFrame()
+    array = fli.grabFrame()
+    print(array)
+    # x=376000
+    # output_dir = r'C:\Users\Public\Documents\seminar\seminar_exposuretime'
+    # for i in range(100):
+    #     x+=4000
+    #     data = move_and_shoot(x, 1000)
+    #     file=r'\output'+ str(94+i)+'.nc'
+    #     data.to_netcdf(output_dir + file)

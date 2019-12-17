@@ -33,6 +33,40 @@ class FLI:
 
     def grabFrame(self):
         return pyfli.grabFrame(self.handle)
+    
+    def setFrameType(self,ftype):
+        """
+        Parameters
+        ----------
+        dev : int
+            Device handle.
+        ftype : {'normal', 'dark', 'flood', 'flush'}
+            The frame type. The last two are associated with the RBI and
+            are guesses as they aren't documented.
+            I guess 'dark' type is taking photo without opening shutter.
+        """
+        pyfli.setFrameType(self.handle,ftype)
+
+    def setHBin(self, hbin):
+        """
+        Parameters
+        ----------
+        hbin : int
+            Bin horizontal dimension in pixels. The valid range is 1..16.
+        """
+        pyfli.setHBin(self.handle,hbin)
+
+
+    def setVBin(self, vbin):
+        """
+        Parameters
+        ----------
+        vbin : int
+            Bin vertical dimension in pixels. The valid range is 1..16.
+        """
+        pyfli.setVBin(self.handle,vbin)
+
+
 
     # open shutter and expose frame. exposes a frame according to the settings (image area,
     # exposure time, bit depth, etc.). exposure time should be assigned before.
