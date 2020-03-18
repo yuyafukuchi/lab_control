@@ -7,36 +7,54 @@ import time
 import logging
 import csv
 import xarray as xr
+import matplotlib.pyplot as plt
 
 # logger
 logger = thr640.logger
-
 
 # global instance
 fli = FLI()
 wavelength_controller = thr640.THR640()
 
 """
-main
+一枚だけ撮影するときに使う
 """
-def take_one_shoot():
-    fli = FLI()
+def take_one_shoot(vbin,exposuretime,count,sleep):
+    """
+    Parameters
+    ----------
+    vbin : int
+        縦のビニングサイズ
 
-    # print information
-    logger.info("カメラの温度: {}".format(fli.getTemperature()))
-    logger.info("カメラの状態: {}".format(fli.getDeviceStatus()))
-    logger.info("カメラモード: {}".format(fli.getCameraModeString(0)))
+    exposuretime: int
+        露光時間[ms]
 
-    fli.setExposureTime(EXPOSURE_TIME)
+    count : int
+        分光器の回折格子の座標
+
+    Returns
+    -------
+    
+    """
+    temperature = fli.getTemperature()
+    # logger.info("カメラの温度: {}".format(fli.getTemperature()))
+    fli.setExposureTime(exposuretime)
+    fli.setVBin(vbin)
+    fli.setImageArea(10,0,2058,512//vbin)
+    time.sleep(.5)
 
     # start exposure
     fli.exposeFrame()
+    time.sleep(sleep)
 
     # exposure終わったらgrab
-    array = fli.grabFrame()
-
-    ## TODO: 出力
-    print(array)
+    array = fli.grabFrame(out=np.empty((512//vbin,2048), np.uint16))
+    data = xr.DataArray(array, dims=['y', 'x'], coords={'vbin': vbin}, 
+                    attrs={'temperature': temperature,
+                            'exposure_time': exposuretime,
+                            'spectrometer_count': count
+                            })
+    return data
 
 """
 撮影して回折格子動かす
@@ -100,7 +118,7 @@ def repeat_move_and_shoot_with_shutter_control(start_count,count_interval,taken_
         # -------shutterを開けて撮影---------
         fli.setFrameType('normal')
         time.sleep(1)
-        ## move
+        # move
         wavelength_controller.goto(count=start_count)
         time.sleep(3)
         # start exposure
@@ -170,7 +188,24 @@ def shoot_and_update_exposure():
 
 
 if __name__ == "__main__":
-    output_dir = r'C:\Users\Public\Documents\seminar\exposuretime_with_shutter_control\no_shutter'
-    output_dir2 = r'C:\Users\Public\Documents\seminar\exposuretime_with_shutter_control\shutter'
+    fli.setTemperature(-55)
+    time.sleep(1)
 
-    repeat_move_and_shoot_with_shutter_control(start_count=-40000,count_interval=4000,taken_count=50,exposuretime=1000,output_dir=output_dir,output_dir_with_shutter_close=output_dir2)
+    EXPOSURETIME = 5000
+
+    ## bin1でexposuretime0.5,1 and bin8でexposuretime1 bin64でexposuretime1
+
+    #count-100000～500000まで撮影
+    between = 4000
+    first_count = -100000
+
+    for i in range(150):
+        count = first_count+between*i
+        wavelength_controller.goto(count=count)
+
+        time.sleep(3)
+
+        data = take_one_shoot(vbin=1, exposuretime=100,count= count,sleep=2)
+        output_dir = r"\Users\Public\Documents\seminar\soturon\2.5mA\bin1\exposuretime0.1\data_{}.nc".format(count)
+        data.to_netcdf(output_dir)
+        time.sleep(1)
